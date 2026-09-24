@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador Físico - Segunda Lei de Newton e Inércia</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        physics: {
+                            bg: '#0f172a',
+                            card: '#1e293b',
+                            border: '#334155',
+                            accent: '#38bdf8',
+                            force: '#eab308',
+                            mru: '#06b6d4',
+                            mruv: '#f43f5e'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'Fira Code', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #f8fafc; }
+        .canvas-container { position: relative; width: 100%; border-radius: 0.75rem; overflow: hidden; }
+        input[type=range] { accent-color: #38bdf8; }
+        .glass-panel { background: rgba(30, 41, 59, 0.85); backdrop-filter: blur(8px); border: 1px solid rgba(255, 255, 255, 0.08); }
+    </style>
+</head>
+<body class="min-h-screen pb-10 flex flex-col">
+
+    <!-- Header -->
+    <header class="border-b border-slate-800 bg-slate-900/90 sticky top-0 z-50 backdrop-blur-md">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="p-2 bg-sky-500/20 text-sky-400 rounded-lg border border-sky-500/30">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold text-slate-100 leading-tight">Simulador de Mecânica Clássica</h1>
+                    <p class="text-xs text-slate-400">Aplicação de Força, Dinâmica & Inércia (MRUV &rarr; MRU)</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-2">
+                <span class="px-3 py-1 text-xs font-semibold rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                    Ambiente VS Code Ready 🚀
+                </span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Grid -->
+    <main class="max-w-7xl mx-auto px-4 py-6 w-full flex-grow grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- Top Telemetry Banner -->
+        <div class="lg:col-span-12 grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div class="glass-panel p-3 rounded-xl flex flex-col justify-center">
+                <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Tempo (<i>t</i>)</span>
+                <div class="flex items-baseline space-x-1">
+                    <span id="metric-time" class="text-2xl font-bold font-mono text-amber-400">0.00</span>
+                    <span class="text-xs text-slate-400 font-mono">s</span>
+                </div>
+            </div>
+
+            <div class="glass-panel p-3 rounded-xl flex flex-col justify-center">
+                <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Aceleração (<i>a</i>)</span>
+                <div class="flex items-baseline space-x-1">
+                    <span id="metric-acc" class="text-2xl font-bold font-mono text-rose-400">5.00</span>
+                    <span class="text-xs text-slate-400 font-mono">m/s²</span>
+                </div>
+            </div>
+
+            <div class="glass-panel p-3 rounded-xl flex flex-col justify-center">
+                <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Velocidade (<i>v</i>)</span>
+                <div class="flex items-baseline space-x-1">
+                    <span id="metric-vel" class="text-2xl font-bold font-mono text-sky-400">0.00</span>
+                    <span class="text-xs text-slate-400 font-mono">m/s</span>
+                </div>
+            </div>
+
+            <div class="glass-panel p-3 rounded-xl flex flex-col justify-center">
+                <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Posição (<i>x</i>)</span>
+                <div class="flex items-baseline space-x-1">
+                    <span id="metric-pos" class="text-2xl font-bold font-mono text-emerald-400">0.00</span>
+                    <span class="text-xs text-slate-400 font-mono">m</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Left Panel: Controls & Sliders -->
+        <div class="lg:col-span-4 flex flex-col gap-5">
+            <div class="glass-panel p-5 rounded-2xl flex flex-col gap-4">
+                <div class="flex justify-between items-center border-b border-slate-700/60 pb-3">
+                    <h2 class="font-semibold text-slate-200 text-sm flex items-center gap-2">
+                        <svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
+                        Parâmetros do Experimento
+                    </h2>
+                    <span id="status-badge" class="px-2.5 py-0.5 text-xs font-bold rounded-full bg-slate-800 text-slate-400 border border-slate-700">
+                        EM REPOUSO
+                    </span>
+                </div>
+
+                <!-- Slider 1: Force -->
+                <div class="space-y-1.5">
+                    <div class="flex justify-between text-xs">
+                        <label for="input-force" class="font-medium text-slate-300">Força Aplicada (<i>F</i>)</label>
+                        <span class="font-mono text-amber-400 font-semibold" id="val-force">10.0 N</span>
+                    </div>
+                    <input type="range" id="input-force" min="1" max="30" step="0.5" value="10" class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer">
+                    <div class="flex justify-between text-[10px] text-slate-500 font-mono">
+                        <span>1 N</span>
+                        <span>15 N</span>
+                        <span>30 N</span>
+                    </div>
+                </div>
+
+                <!-- Slider 2: Mass -->
+                <div class="space-y-1.5">
+                    <div class="flex justify-between text-xs">
+                        <label for="input-mass" class="font-medium text-slate-300">Massa da Esfera (<i>m</i>)</label>
+                        <span class="font-mono text-sky-400 font-semibold" id="val-mass">2.0 kg</span>
+                    </div>
+                    <input type="range" id="input-mass" min="0.5" max="10" step="0.5" value="2" class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer">
+                    <div class="flex justify-between text-[10px] text-slate-500 font-mono">
+                        <span>0.5 kg</span>
+                        <span>5.0 kg</span>
+                        <span>10.0 kg</span>
+                    </div>
+                </div>
+
+                <!-- Slider 3: Duration of Force -->
+                <div class="space-y-1.5">
+                    <div class="flex justify-between text-xs">
+                        <label for="input-dur" class="font-medium text-slate-300">Tempo de Atuação (<i>t</i><sub>força</sub>)</label>
+                        <span class="font-mono text-rose-400 font-semibold" id="val-dur">2.0 s</span>
+                    </div>
+                    <input type="range" id="input-dur" min="0.5" max="4.0" step="0.1" value="2.0" class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer">
+                    <div class="flex justify-between text-[10px] text-slate-500 font-mono">
+                        <span>0.5 s</span>
+                        <span>2.0 s</span>
+                        <span>4.0 s</span>
+                    </div>
+                </div>
+
+                <!-- Slider 4: Simulation Speed -->
+                <div class="space-y-1.5 pt-2 border-t border-slate-700/40">
+                    <div class="flex justify-between text-xs">
+                        <label for="input-speed" class="font-medium text-slate-400">Velocidade da Animação</label>
+                        <span class="font-mono text-slate-300" id="val-speed">1.0x</span>
+                    </div>
+                    <input type="range" id="input-speed" min="0.25" max="2.0" step="0.25" value="1.0" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer">
+                </div>
+
+                <!-- Controls Buttons -->
+                <div class="pt-3 flex gap-2">
+                    <button id="btn-play" class="flex-1 bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold py-2.5 px-4 rounded-xl transition duration-150 shadow-lg shadow-sky-500/20 flex items-center justify-center gap-2 text-sm">
+                        <svg id="icon-play" class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                        <span id="text-play">Iniciar</span>
+                    </button>
+
+                    <button id="btn-step" title="Avançar um passo (+0.05s)" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 p-2.5 rounded-xl transition">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"/></svg>
+                    </button>
+
+                    <button id="btn-reset" title="Reiniciar Simulação" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 p-2.5 rounded-xl transition">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                    </button>
+                </div>
+
+                <!-- Presets section -->
+                <div class="pt-2">
+                    <span class="text-[11px] font-semibold text-slate-400 block mb-2 uppercase tracking-wider">Presets de Teste:</span>
+                    <div class="grid grid-cols-2 gap-2 text-xs">
+                        <button id="preset-default" class="bg-slate-800/80 hover:bg-slate-700 text-slate-300 py-1.5 px-2 rounded-lg text-left border border-slate-700/50 truncate">
+                            🎯 Padrão (10N / 2kg)
+                        </button>
+                        <button id="preset-heavy" class="bg-slate-800/80 hover:bg-slate-700 text-slate-300 py-1.5 px-2 rounded-lg text-left border border-slate-700/50 truncate">
+                            🏋️ Pesada (10N / 8kg)
+                        </button>
+                        <button id="preset-strong" class="bg-slate-800/80 hover:bg-slate-700 text-slate-300 py-1.5 px-2 rounded-lg text-left border border-slate-700/50 truncate">
+                            🚀 Alta Força (25N / 2kg)
+                        </button>
+                        <button id="preset-impulse" class="bg-slate-800/80 hover:bg-slate-700 text-slate-300 py-1.5 px-2 rounded-lg text-left border border-slate-700/50 truncate">
+                            ⚡ Impulso Curto (0.8s)
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Physics Concepts Card -->
+            <div class="glass-panel p-4 rounded-2xl text-xs space-y-2 text-slate-300">
+                <h3 class="font-bold text-slate-100 flex items-center gap-1.5">
+                    <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    Conceitos Físicos Aplicados
+                </h3>
+                <p><strong class="text-rose-400">Fase 1 (<i>t</i> ≤ <i>t</i><sub>força</sub>):</strong> 2ª Lei de Newton (<i>F</i> = <i>m</i> · <i>a</i>). A aceleração <i>a</i> = <i>F</i>/<i>m</i> é constante. O movimento é <em>MRUV</em> com velocidade <i>v</i>(<i>t</i>) = <i>a</i> · <i>t</i>.</p>
+                <p><strong class="text-cyan-400">Fase 2 (<i>t</i> &gt; <i>t</i><sub>força</sub>):</strong> 1ª Lei de Newton (Inércia). Sem força resultante (<i>F</i> = 0), a aceleração torna-se nula (<i>a</i> = 0). A esfera continua em <em>MRU</em> com velocidade constante.</p>
+            </div>
+        </div>
+
+        <!-- Right Panel: Canvases (Simulation + Graph) -->
+        <div class="lg:col-span-8 flex flex-col gap-5">
+            
+            <!-- Canvas 1: Animation scene -->
+            <div class="glass-panel p-4 rounded-2xl flex flex-col gap-2">
+                <div class="flex justify-between items-center text-xs text-slate-400">
+                    <span class="font-semibold text-slate-200 flex items-center gap-2">
+                        <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></span>
+                        Animação do Movimento da Esfera
+                    </span>
+                    <span id="legend-phase" class="font-mono text-amber-400 font-medium">Seta amarela = Vetor Força Aplicada</span>
+                </div>
+                <div class="canvas-container bg-slate-950/80 border border-slate-800 rounded-xl overflow-hidden aspect-[16/7]">
+                    <canvas id="canvas-scene" class="w-full h-full block"></canvas>
+                </div>
+            </div>
+
+            <!-- Canvas 2: Velocity vs Time Graph -->
+            <div class="glass-panel p-4 rounded-2xl flex flex-col gap-2">
+                <div class="flex justify-between items-center text-xs text-slate-400">
+                    <span class="font-semibold text-slate-200 flex items-center gap-2">
+                        <svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/></svg>
+                        Gráfico: Velocidade vs Tempo <i>v</i>(<i>t</i>)
+                    </span>
+                    <span class="font-mono text-xs text-rose-400 flex items-center gap-1">
+                        <span class="w-2 h-2 rounded-full bg-rose-500 inline-block"></span> Destaque: Ponto de remoção da força
+                    </span>
+                </div>
+                <div class="canvas-container bg-slate-950/80 border border-slate-800 rounded-xl overflow-hidden aspect-[16/6]">
+                    <canvas id="canvas-graph" class="w-full h-full block"></canvas>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <script>
+        // Physics Simulation State Variables
+        const state = {
+            F: 10.0,       // Force in Newtons
+            m: 2.0,        // Mass in kg
+            t_force: 2.0,  // Duration of force in seconds
+            speedScale: 1.0, // Animation playback speed multiplier
+            
+            // Dynamics state
+            t: 0.0,        // Current simulation time (s)
+            x: 0.0,        // Position (m)
+            v: 0.0,        // Velocity (m/s)
+            a: 5.0,        // Acceleration (m/s²)
+            
+            // App state
+            isRunning: false,
+            maxTimeLimit: 6.0, // Max time to plot on graph
+            
+            // Visual transition effects
+            pulseAlpha: 0,
+            pulseRadius: 0,
+            forceCeasedAt: null
+        };
+
+        // Canvas DOM Elements
+        const canvasScene = document.getElementById('canvas-scene');
+        const ctxScene = canvasScene.getContext('2d');
+        
+        const canvasGraph = document.getElementById('canvas-graph');
+        const ctxGraph = canvasGraph.getContext('2d');
+
+        // UI Element References
+        const inputForce = document.getElementById('input-force');
+        const inputMass = document.getElementById('input-mass');
+        const inputDur = document.getElementById('input-dur');
+        const inputSpeed = document.getElementById('input-speed');
+
+        const valForce = document.getElementById('val-force');
+        const valMass = document.getElementById('val-mass');
+        const valDur = document.getElementById('val-dur');
+        const valSpeed = document.getElementById('val-speed');
+
+        const metricTime = document.getElementById('metric-time');
+        const metricAcc = document.getElementById('metric-acc');
+        const metricVel = document.getElementById('metric-vel');
+        const metricPos = document.getElementById('metric-pos');
+
+        const statusBadge = document.getElementById('status-badge');
+        const legendPhase = document.getElementById('legend-phase');
+
+        const btnPlay = document.getElementById('btn-play');
+        const iconPlay = document.getElementById('icon-play');
+        const textPlay = document.getElementById('text-play');
+        const btnReset = document.getElementById('btn-reset');
+        const btnStep = document.getElementById('btn-step');
+
+        // Handle HiDPI Crisp Canvas Rendering
+        function resizeCanvases() {
+            const dpr = window.devicePixelRatio || 1;
+            
+            [canvasScene, canvasGraph].forEach(canvas => {
+                const rect = canvas.getBoundingClientRect();
+                canvas.width = rect.width * dpr;
+                canvas.height = rect.height * dpr;
+            });
+            
+            render();
+        }
+
+        window.addEventListener('resize', resizeCanvases);
+
+        // Calculate physics values at time t
+        function computePhysics(t) {
+            const a_active = state.F / state.m; // Acceleration during force application
+            let a = 0;
+            let v = 0;
+            let x = 0;
+
+            if (t <= state.t_force) {
+                // Phase 1: Uniformly Accelerated Motion (MRUV)
+                a = a_active;
+                v = a_active * t;
+                x = 0.5 * a_active * Math.pow(t, 2);
+            } else {
+                // Phase 2: Uniform Motion (MRU - Inertia)
+                a = 0;
+                const v_max = a_active * state.t_force;
+                const x_at_t_force = 0.5 * a_active * Math.pow(state.t_force, 2);
+                
+                v = v_max;
+                x = x_at_t_force + v_max * (t - state.t_force);
+            }
+
+            return { a, v, x, a_active };
+        }
+
+        function drawScene() {
+            const width = canvasScene.width;
+            const height = canvasScene.height;
+            const dpr = window.devicePixelRatio || 1;
+
+            ctxScene.save();
+            ctxScene.scale(dpr, dpr);
+            const w = width / dpr;
+            const h = height / dpr;
+
+            // Clear Background
+            ctxScene.fillStyle = '#090d16';
+            ctxScene.fillRect(0, 0, w, h);
+
+            // Ground Track Height
+            const yGround = h - 50;
+            const sphereRadius = 22;
+
+            // World-to-Screen Mapping
+            // Scale: 1 meter = 40 pixels on screen
+            const pixelsPerMeter = 32;
+            const startX = 70; // Initial x screen offset
+            
+            // Camera follow offset so sphere remains nicely framed
+            let cameraX = 0;
+            const currentSphereX = startX + state.x * pixelsPerMeter;
+            if (currentSphereX > w * 0.6) {
+                cameraX = currentSphereX - w * 0.6;
+            }
+
+            // Draw Ground Surface Line
+            ctxScene.strokeStyle = '#334155';
+            ctxScene.lineWidth = 3;
+            ctxScene.beginPath();
+            ctxScene.moveTo(0, yGround);
+            ctxScene.lineTo(w, yGround);
+            ctxScene.stroke();
+
+            // Ground pattern shading
+            ctxScene.fillStyle = 'rgba(30, 41, 59, 0.4)';
+            ctxScene.fillRect(0, yGround + 2, w, 48);
+
+            // Distance Markers (Ticks every 2 meters)
+            ctxScene.fillStyle = '#64748b';
+            ctxScene.font = '10px "JetBrains Mono", monospace';
+            ctxScene.textAlign = 'center';
+
+            const maxMetersInView = Math.ceil((w + cameraX) / pixelsPerMeter);
+            for (let m = 0; m <= maxMetersInView + 5; m += 2) {
+                const screenX = startX + m * pixelsPerMeter - cameraX;
+                if (screenX >= -20 && screenX <= w + 20) {
+                    ctxScene.strokeStyle = '#334155';
+                    ctxScene.lineWidth = 1;
+                    ctxScene.beginPath();
+                    ctxScene.moveTo(screenX, yGround);
+                    ctxScene.lineTo(screenX, yGround + 8);
+                    ctxScene.stroke();
+
+                    ctxScene.fillText(`${m}m`, screenX, yGround + 22);
+                }
+            }
+
+            // Sphere Position Calculation
+            const sphereCenterX = currentSphereX - cameraX;
+            const sphereCenterY = yGround - sphereRadius;
+
+            // Check if Force is Active
+            const isForceActive = state.t <= state.t_force && state.t > 0;
+            const hasForceCeased = state.t > state.t_force;
+
+            // Draw Force Vector Arrow if Force is Active
+            if (isForceActive) {
+                const arrowLength = Math.min(80, 25 + state.F * 2);
+                const arrowStartX = sphereCenterX - sphereRadius - arrowLength - 10;
+                const arrowY = sphereCenterY;
+
+                // Glowing arrow background
+                ctxScene.shadowColor = '#eab308';
+                ctxScene.shadowBlur = 12;
+                ctxScene.strokeStyle = '#eab308';
+                ctxScene.lineWidth = 4;
+
+                // Shaft
+                ctxScene.beginPath();
+                ctxScene.moveTo(arrowStartX, arrowY);
+                ctxScene.lineTo(sphereCenterX - sphereRadius - 6, arrowY);
+                ctxScene.stroke();
+
+                // Arrow Head
+                ctxScene.fillStyle = '#eab308';
+                ctxScene.beginPath();
+                ctxScene.moveTo(sphereCenterX - sphereRadius - 2, arrowY);
+                ctxScene.lineTo(sphereCenterX - sphereRadius - 12, arrowY - 7);
+                ctxScene.lineTo(sphereCenterX - sphereRadius - 12, arrowY + 7);
+                ctxScene.closePath();
+                ctxScene.fill();
+
+                // Reset shadow
+                ctxScene.shadowBlur = 0;
+
+                // Label above arrow
+                ctxScene.fillStyle = '#fef08a';
+                ctxScene.font = 'bold 11px sans-serif';
+                ctxScene.fillText(`F = ${state.F.toFixed(1)} N`, arrowStartX + arrowLength / 2, arrowY - 12);
+            }
+
+            // Draw Shockwave Pulse Effect at Transition Point
+            if (hasForceCeased && state.pulseAlpha > 0) {
+                ctxScene.save();
+                ctxScene.strokeStyle = `rgba(6, 182, 212, ${state.pulseAlpha})`;
+                ctxScene.lineWidth = 3;
+                ctxScene.beginPath();
+                ctxScene.arc(sphereCenterX, sphereCenterY, sphereRadius + state.pulseRadius, 0, Math.PI * 2);
+                ctxScene.stroke();
+                ctxScene.restore();
+            }
+
+            // Draw Sphere Shadow
+            ctxScene.fillStyle = 'rgba(0, 0, 0, 0.4)';
+            ctxScene.beginPath();
+            ctxScene.ellipse(sphereCenterX, yGround - 2, sphereRadius * 0.9, 5, 0, 0, Math.PI * 2);
+            ctxScene.fill();
+
+            // Sphere Color & Gradient
+            // Red/Coral when accelerating under force, Cyan/Electric Blue when coasting in MRU
+            const sphereGradient = ctxScene.createRadialGradient(
+                sphereCenterX - 6, sphereCenterY - 6, 2,
+                sphereCenterX, sphereCenterY, sphereRadius
+            );
+
+            if (isForceActive || state.t === 0) {
+                sphereGradient.addColorStop(0, '#fca5a5');
+                sphereGradient.addColorStop(0.7, '#ef4444');
+                sphereGradient.addColorStop(1, '#991b1b');
+            } else {
+                // Coasting (MRU) - Cyan Highlight Color
+                sphereGradient.addColorStop(0, '#a5f3fc');
+                sphereGradient.addColorStop(0.7, '#06b6d4');
+                sphereGradient.addColorStop(1, '#0e7490');
+            }
+
+            ctxScene.shadowColor = isForceActive ? 'rgba(239, 68, 68, 0.5)' : 'rgba(6, 182, 212, 0.5)';
+            ctxScene.shadowBlur = 10;
+
+            ctxScene.fillStyle = sphereGradient;
+            ctxScene.beginPath();
+            ctxScene.arc(sphereCenterX, sphereCenterY, sphereRadius, 0, Math.PI * 2);
+            ctxScene.fill();
+            ctxScene.shadowBlur = 0;
+
+            // Sphere Spokes (Rotates as sphere rolls)
+            const rotationAngle = state.x; // Angle proportional to distance moved
+            ctxScene.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+            ctxScene.lineWidth = 2;
+            ctxScene.beginPath();
+            ctxScene.arc(sphereCenterX, sphereCenterY, sphereRadius - 4, rotationAngle, rotationAngle + Math.PI * 1.5);
+            ctxScene.stroke();
+
+            // Label above Sphere
+            ctxScene.font = '11px sans-serif';
+            ctxScene.fillStyle = '#e2e8f0';
+            ctxScene.textAlign = 'center';
+            if (isForceActive) {
+                ctxScene.fillStyle = '#fcf08a';
+                ctxScene.fillText('ACELERANDO (MRUV)', sphereCenterX, sphereCenterY - sphereRadius - 10);
+            } else if (hasForceCeased) {
+                ctxScene.fillStyle = '#67e8f9';
+                ctxScene.fillText('INÉRCIA (MRU)', sphereCenterX, sphereCenterY - sphereRadius - 10);
+            } else {
+                ctxScene.fillText('REPOUSO', sphereCenterX, sphereCenterY - sphereRadius - 10);
+            }
+
+            ctxScene.restore();
+        }
+
+        function drawGraph() {
+            const width = canvasGraph.width;
+            const height = canvasGraph.height;
+            const dpr = window.devicePixelRatio || 1;
+
+            ctxGraph.save();
+            ctxGraph.scale(dpr, dpr);
+            const w = width / dpr;
+            const h = height / dpr;
+
+            // Clear Background
+            ctxGraph.fillStyle = '#090d16';
+            ctxGraph.fillRect(0, 0, w, h);
+
+            // Graph Padding
+            const padding = { top: 25, right: 35, bottom: 35, left: 45 };
+            const graphW = w - padding.left - padding.right;
+            const graphH = h - padding.top - padding.bottom;
+
+            // Calculate Max Axes Scales
+            const maxT = Math.max(state.maxTimeLimit, state.t_force * 1.8);
+            const maxV = Math.max(12, (state.F / state.m) * state.t_force * 1.25);
+
+            // Coordinate mapping functions
+            const tToX = (tVal) => padding.left + (tVal / maxT) * graphW;
+            const vToY = (vVal) => padding.top + graphH - (vVal / maxV) * graphH;
+
+            // Draw Axes Grid Lines & Labels
+            ctxGraph.strokeStyle = '#1e293b';
+            ctxGraph.lineWidth = 1;
+
+            // Horizontal Grid Lines (Velocity)
+            const vStep = maxV > 20 ? 5 : 2;
+            ctxGraph.fillStyle = '#64748b';
+            ctxGraph.font = '10px "JetBrains Mono", monospace';
+            ctxGraph.textAlign = 'right';
+
+            for (let v = 0; v <= maxV; v += vStep) {
+                const y = vToY(v);
+                ctxGraph.beginPath();
+                ctxGraph.moveTo(padding.left, y);
+                ctxGraph.lineTo(w - padding.right, y);
+                ctxGraph.stroke();
+
+                ctxGraph.fillText(v.toFixed(0), padding.left - 8, y + 3);
+            }
+
+            // Vertical Grid Lines (Time)
+            ctxGraph.textAlign = 'center';
+            for (let t = 0; t <= maxT; t += 1.0) {
+                const x = tToX(t);
+                ctxGraph.beginPath();
+                ctxGraph.moveTo(x, padding.top);
+                ctxGraph.lineTo(x, h - padding.bottom);
+                ctxGraph.stroke();
+
+                ctxGraph.fillText(`${t}s`, x, h - padding.bottom + 15);
+            }
+
+            // Main Axes Lines
+            ctxGraph.strokeStyle = '#475569';
+            ctxGraph.lineWidth = 2;
+            ctxGraph.beginPath();
+            // Y Axis
+            ctxGraph.moveTo(padding.left, padding.top);
+            ctxGraph.lineTo(padding.left, h - padding.bottom);
+            // X Axis
+            ctxGraph.lineTo(w - padding.right, h - padding.bottom);
+            ctxGraph.stroke();
+
+            // Axis Title Labels
+            ctxGraph.fillStyle = '#94a3b8';
+            ctxGraph.font = 'bold 10px sans-serif';
+            ctxGraph.textAlign = 'left';
+            ctxGraph.fillText('v (m/s)', padding.left - 35, padding.top - 10);
+
+            ctxGraph.textAlign = 'right';
+            ctxGraph.fillText('t (s)', w - padding.right, h - padding.bottom + 28);
+
+            // Calculate Transition Velocity Point v(t_force)
+            const v_at_t_force = (state.F / state.m) * state.t_force;
+            const x_t_force = tToX(state.t_force);
+            const y_v_force = vToY(v_at_t_force);
+
+            // Draw Dashed Reference Lines for t_force
+            ctxGraph.setLineDash([4, 4]);
+            ctxGraph.strokeStyle = 'rgba(244, 63, 94, 0.6)';
+            ctxGraph.lineWidth = 1.5;
+
+            // Vertical line down to t-axis
+            ctxGraph.beginPath();
+            ctxGraph.moveTo(x_t_force, y_v_force);
+            ctxGraph.lineTo(x_t_force, h - padding.bottom);
+            ctxGraph.stroke();
+
+            // Horizontal line left to v-axis
+            ctxGraph.beginPath();
+            ctxGraph.moveTo(x_t_force, y_v_force);
+            ctxGraph.lineTo(padding.left, y_v_force);
+            ctxGraph.stroke();
+
+            ctxGraph.setLineDash([]); // Reset dashed
+
+            // Draw Velocity Curve up to current time state.t
+            const sampleStep = 0.02;
+            ctxGraph.lineWidth = 3.5;
+
+            // Phase 1 Curve Segment (0 <= t <= t_force)
+            ctxGraph.strokeStyle = '#eab308'; // Yellow for acceleration phase
+            ctxGraph.beginPath();
+            ctxGraph.moveTo(tToX(0), vToY(0));
+
+            const tEndPhase1 = Math.min(state.t, state.t_force);
+            for (let t = 0; t <= tEndPhase1; t += sampleStep) {
+                const phys = computePhysics(t);
+                ctxGraph.lineTo(tToX(t), vToY(phys.v));
+            }
+            ctxGraph.stroke();
+
+            // Phase 2 Curve Segment (t > t_force)
+            if (state.t > state.t_force) {
+                ctxGraph.strokeStyle = '#06b6d4'; // Cyan for MRU constant velocity
+                ctxGraph.beginPath();
+                ctxGraph.moveTo(x_t_force, y_v_force);
+
+                for (let t = state.t_force; t <= state.t; t += sampleStep) {
+                    const phys = computePhysics(t);
+                    ctxGraph.lineTo(tToX(t), vToY(phys.v));
+                }
+                ctxGraph.stroke();
+            }
+
+            /* HIGHLIGHT MARKER AT t = t_force */
+            // Special Callout Marker when simulation reaches or passes t_force
+            if (state.t >= state.t_force) {
+                ctxGraph.save();
+                
+                // Pulsing highlight dot
+                ctxGraph.shadowColor = '#f43f5e';
+                ctxGraph.shadowBlur = 10;
+                ctxGraph.fillStyle = '#f43f5e';
+                ctxGraph.beginPath();
+                ctxGraph.arc(x_t_force, y_v_force, 6, 0, Math.PI * 2);
+                ctxGraph.fill();
+
+                ctxGraph.fillStyle = '#ffffff';
+                ctxGraph.beginPath();
+                ctxGraph.arc(x_t_force, y_v_force, 2.5, 0, Math.PI * 2);
+                ctxGraph.fill();
+                ctxGraph.restore();
+
+                // Annotation Callout Box
+                ctxGraph.fillStyle = 'rgba(244, 63, 94, 0.2)';
+                ctxGraph.strokeStyle = '#f43f5e';
+                ctxGraph.lineWidth = 1;
+                
+                const boxW = 120;
+                const boxH = 32;
+                const boxX = Math.min(w - padding.right - boxW, x_t_force + 10);
+                const boxY = Math.max(padding.top + 5, y_v_force - 40);
+
+                ctxGraph.beginPath();
+                if (typeof ctxGraph.roundRect === 'function') {
+                    ctxGraph.roundRect(boxX, boxY, boxW, boxH, 6);
+                } else {
+                    ctxGraph.rect(boxX, boxY, boxW, boxH);
+                }
+                ctxGraph.fill();
+                ctxGraph.stroke();
+
+                ctxGraph.fillStyle = '#fecdd3';
+                ctxGraph.font = 'bold 10px sans-serif';
+                ctxGraph.textAlign = 'left';
+                ctxGraph.fillText(`Força Cessou! (t = ${state.t_force.toFixed(1)}s)`, boxX + 6, boxY + 13);
+                ctxGraph.fillText(`v = ${v_at_t_force.toFixed(1)} m/s (Constante)`, boxX + 6, boxY + 25);
+            }
+
+            // Current Simulation Time Indicator Point
+            if (state.t > 0) {
+                const currentPhys = computePhysics(state.t);
+                const curX = tToX(state.t);
+                const curY = vToY(currentPhys.v);
+
+                ctxGraph.fillStyle = '#38bdf8';
+                ctxGraph.strokeStyle = '#ffffff';
+                ctxGraph.lineWidth = 2;
+                ctxGraph.beginPath();
+                ctxGraph.arc(curX, curY, 5, 0, Math.PI * 2);
+                ctxGraph.fill();
+                ctxGraph.stroke();
+            }
+
+            ctxGraph.restore();
+        }
+
+        function updateUI() {
+            // Read values based on current time
+            const phys = computePhysics(state.t);
+            state.x = phys.x;
+            state.v = phys.v;
+            state.a = phys.a;
+
+            // Telemetry Cards
+            metricTime.textContent = state.t.toFixed(2);
+            metricAcc.textContent = state.a.toFixed(2);
+            metricVel.textContent = state.v.toFixed(2);
+            metricPos.textContent = state.x.toFixed(2);
+
+            // Status Badge
+            if (state.t === 0) {
+                statusBadge.textContent = "EM REPOUSO";
+                statusBadge.className = "px-2.5 py-0.5 text-xs font-bold rounded-full bg-slate-800 text-slate-400 border border-slate-700";
+                legendPhase.textContent = "Força de 10 N pronta para atuar";
+                legendPhase.className = "font-mono text-slate-400 font-medium";
+            } else if (state.t <= state.t_force) {
+                statusBadge.textContent = "FORÇA ATIVA (MRUV)";
+                statusBadge.className = "px-2.5 py-0.5 text-xs font-bold rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse";
+                legendPhase.textContent = `Força F = ${state.F}N atuando (Aceleração a = ${phys.a_active.toFixed(1)} m/s²)`;
+                legendPhase.className = "font-mono text-amber-400 font-medium";
+            } else {
+                statusBadge.textContent = "SEM FORÇA (MRU - INÉRCIA)";
+                statusBadge.className = "px-2.5 py-0.5 text-xs font-bold rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40";
+                legendPhase.textContent = "Força removida! Velocidade mantida por inércia (a = 0)";
+                legendPhase.className = "font-mono text-cyan-400 font-medium";
+            }
+        }
+
+        function render() {
+            updateUI();
+            drawScene();
+            drawGraph();
+        }
+
+        let lastFrameTime = null;
+
+        function animationLoop(timestamp) {
+            if (!lastFrameTime) lastFrameTime = timestamp;
+            const deltaSeconds = (timestamp - lastFrameTime) / 1000;
+            lastFrameTime = timestamp;
+
+            if (state.isRunning) {
+                const prevT = state.t;
+                state.t += deltaSeconds * state.speedScale;
+
+                // Detect exact moment when force stops acting to trigger shockwave pulse
+                if (prevT <= state.t_force && state.t > state.t_force) {
+                    state.pulseAlpha = 1.0;
+                    state.pulseRadius = 0;
+                }
+
+                // Decay shockwave pulse
+                if (state.pulseAlpha > 0) {
+                    state.pulseAlpha -= deltaSeconds * 1.5;
+                    state.pulseRadius += deltaSeconds * 40;
+                }
+
+                // Auto stop at end of graph limit
+                if (state.t >= state.maxTimeLimit) {
+                    state.t = state.maxTimeLimit;
+                    state.isRunning = false;
+                    updatePlayButton();
+                }
+
+                render();
+                requestAnimationFrame(animationLoop);
+            }
+        }
+
+        function updatePlayButton() {
+            if (state.isRunning) {
+                iconPlay.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
+                textPlay.textContent = 'Pausar';
+                btnPlay.className = "flex-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-2.5 px-4 rounded-xl transition duration-150 shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 text-sm";
+            } else {
+                iconPlay.innerHTML = '<path d="M8 5v14l11-7z"/>';
+                textPlay.textContent = state.t >= state.maxTimeLimit ? 'Reiniciar & Rodar' : 'Iniciar';
+                btnPlay.className = "flex-1 bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold py-2.5 px-4 rounded-xl transition duration-150 shadow-lg shadow-sky-500/20 flex items-center justify-center gap-2 text-sm";
+            }
+        }
+
+        // Sliders Listeners
+        inputForce.addEventListener('input', (e) => {
+            state.F = parseFloat(e.target.value);
+            valForce.textContent = `${state.F.toFixed(1)} N`;
+            render();
+        });
+
+        inputMass.addEventListener('input', (e) => {
+            state.m = parseFloat(e.target.value);
+            valMass.textContent = `${state.m.toFixed(1)} kg`;
+            render();
+        });
+
+        inputDur.addEventListener('input', (e) => {
+            state.t_force = parseFloat(e.target.value);
+            valDur.textContent = `${state.t_force.toFixed(1)} s`;
+            render();
+        });
+
+        inputSpeed.addEventListener('input', (e) => {
+            state.speedScale = parseFloat(e.target.value);
+            valSpeed.textContent = `${state.speedScale.toFixed(2)}x`;
+        });
+
+        // Buttons Listeners
+        btnPlay.addEventListener('click', () => {
+            if (state.t >= state.maxTimeLimit) {
+                state.t = 0;
+            }
+            state.isRunning = !state.isRunning;
+            updatePlayButton();
+
+            if (state.isRunning) {
+                lastFrameTime = performance.now();
+                requestAnimationFrame(animationLoop);
+            }
+        });
+
+        btnReset.addEventListener('click', () => {
+            state.isRunning = false;
+            state.t = 0;
+            state.pulseAlpha = 0;
+            updatePlayButton();
+            render();
+        });
+
+        btnStep.addEventListener('click', () => {
+            state.isRunning = false;
+            updatePlayButton();
+            state.t = Math.min(state.maxTimeLimit, state.t + 0.05);
+            render();
+        });
+
+        // Preset Configurations
+        function applyPreset(f, m, dur) {
+            state.F = f;
+            state.m = m;
+            state.t_force = dur;
+            state.t = 0;
+            state.isRunning = false;
+
+            inputForce.value = f;
+            inputMass.value = m;
+            inputDur.value = dur;
+
+            valForce.textContent = `${f.toFixed(1)} N`;
+            valMass.textContent = `${m.toFixed(1)} kg`;
+            valDur.textContent = `${dur.toFixed(1)} s`;
+
+            updatePlayButton();
+            render();
+        }
+
+        document.getElementById('preset-default').addEventListener('click', () => applyPreset(10.0, 2.0, 2.0));
+        document.getElementById('preset-heavy').addEventListener('click', () => applyPreset(10.0, 8.0, 3.0));
+        document.getElementById('preset-strong').addEventListener('click', () => applyPreset(25.0, 2.0, 1.5));
+        document.getElementById('preset-impulse').addEventListener('click', () => applyPreset(20.0, 2.0, 0.8));
+
+        // Initial setup on load
+        window.addEventListener('load', () => {
+            resizeCanvases();
+        });
+    </script>
+</body>
+</html>
