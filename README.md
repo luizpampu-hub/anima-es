@@ -5,7 +5,7 @@ onde coloco as animações de física
 Esta aplicação simula o movimento de uma esfera de $2\text{ kg}$ submetida a uma força de $10\text{ N}$ por $2$ segundos, gerando o gráfico de **Velocidade vs Tempo** em tempo real.
 
 ### 🌐 Teste a Aplicação
-👉 **[Clique aqui para abrir o Simulador Interativo](https://github.com/luizpampu-hub/anima-es/blob/main/Objetoegrafico.html)**
+👉 **[Clique aqui para abrir o Simulador Interativo](https://github.com/luizpampu-hub/anima-es/blob/main/index.html)**
 
 ---
 
